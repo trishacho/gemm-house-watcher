@@ -264,7 +264,7 @@ async def main():
                         # so its absence is NOT proof that results have loaded.
                         # Wait for the availability route and for every result
                         # cell to leave its loading state.
-                        await page.wait_for_url(re.compile(r".*/reserve/availability(?:\\?.*)?$"), timeout=60000)
+                        await page.wait_for_url("**/reserve/availability**", timeout=60000)
                         await page.wait_for_function("""() => {
                           const cells = [...document.querySelectorAll('[data-testid="Time Grid Cell"]')];
                           return cells.length > 0 && cells.every(cell => cell.getAttribute('data-loading') !== 'true');
