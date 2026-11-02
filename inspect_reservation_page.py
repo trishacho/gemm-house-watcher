@@ -265,11 +265,16 @@ async def main():
                         # Wait for the availability route and for every result
                         # cell to leave its loading state.
                         await page.wait_for_url("**/reserve/availability**", timeout=60000)
+                        # The result view may not render Time Grid Cell controls
+                        # at all when the requested time is unavailable. Treat
+                        # the visible no-availability copy as a completed result.
                         await page.wait_for_function("""() => {
-                          const cells = [...document.querySelectorAll('[data-testid="Time Grid Cell"]')];
-                          return cells.length > 0 && cells.every(cell => cell.getAttribute('data-loading') !== 'true');
+                          const text = (document.body?.innerText || '').replace(/\\s+/g, ' ').trim();
+                          return text.includes('There is no availability for your chosen time')
+                            || document.querySelectorAll('[data-testid="Time Grid Cell"]').length > 0
+                            && [...document.querySelectorAll('[data-testid="Time Grid Cell"]')].every(cell => cell.getAttribute('data-loading') !== 'true');
                         }""", timeout=60000)
-                        sections.append("Availability results finished loading: all Time Grid Cell controls left data-loading=true.")
+                        sections.append("Availability result reached a completed state (no-availability message or settled time grid).")
                     except Exception as exc:
                         sections.append(f"Availability results did not finish loading within 60 seconds: {type(exc).__name__}: {exc}")
                     await page.wait_for_timeout(1200)
