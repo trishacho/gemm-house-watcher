@@ -150,36 +150,18 @@ async def main():
             await date_button.click()
             await page.wait_for_timeout(700)
             sections.append(await capture(page, "DATE PICKER OPEN"))
-            # Navigate month-by-month until the calendar shows December 2026.
-            for month_step in range(3):
-                calendar_text = await page.get_by_test_id("Bottom Panel").inner_text()
-                if re.search(r"December\s+2026", calendar_text, re.I):
-                    break
-                panel_buttons = page.get_by_test_id("Bottom Panel").locator("button")
-                explicit_next = page.locator('[data-testid="Bottom Panel"] button[aria-label*="next" i], [data-testid="Bottom Panel"] button[title*="next" i], [data-testid="Bottom Panel"] button[data-testid*="next" i]')
-                arrow_next = panel_buttons.filter(has_text=re.compile(r"^\s*(>|›|»)\s*$"))
-                if await explicit_next.count() == 1 and await explicit_next.is_visible() and await explicit_next.is_enabled():
-                    await explicit_next.click()
-                elif await arrow_next.count() == 1 and await arrow_next.is_visible() and await arrow_next.is_enabled():
-                    await arrow_next.click()
-                else:
-                    sections.append("Could not uniquely identify the calendar's next-month arrow.")
-                    break
-                await page.wait_for_timeout(350)
-            calendar_text = await page.get_by_test_id("Bottom Panel").inner_text()
-            sections.append(f"Calendar after month navigation: {calendar_text[:1200]}")
-            if re.search(r"December\s+2026", calendar_text, re.I):
-                dec2_button = page.get_by_test_id("Bottom Panel").locator("button").filter(
-                    has_text=re.compile(r"^\s*2\s*$")
-                )
-                if await dec2_button.count() == 1 and await dec2_button.is_enabled():
-                    await dec2_button.click()
-                    await page.wait_for_timeout(500)
-                    sections.append(await capture(page, "DECEMBER 2 SELECTED"))
-                else:
-                    sections.append(f"December 2 day cell not uniquely selectable; count={await dec2_button.count()}.")
+            # The calendar may render early-December dates in the trailing
+            # row of November. Select by its exact ISO date, not by day number
+            # or by advancing blindly into later months.
+            dec2_button = page.locator('button[data-testid="day"][data-date="2026-12-02"]')
+            if await dec2_button.count() == 1 and await dec2_button.is_enabled():
+                await dec2_button.click()
+                await page.wait_for_timeout(700)
+                sections.append("Selected the exact calendar cell with data-date=2026-12-02.")
+                sections.append(await capture(page, "DECEMBER 2 SELECTED"))
             else:
-                sections.append("Calendar did not reach December 2026; date not selected.")
+                sections.append(f"Dec 2 exact-date cell not uniquely selectable; count={await dec2_button.count()}.")
+                sections.append(await capture(page, "DECEMBER 2 CELL NOT SELECTED"))
             await dismiss_bottom_panel(page, sections, "date selection")
         else:
             sections.append(f"Date opener not found uniquely; count={await date_button.count()}.")
