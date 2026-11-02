@@ -234,7 +234,18 @@ async def main():
                     sections.append(f"Could not open time picker for {time_label}: {type(exc).__name__}: {exc}")
                     await dismiss_bottom_panel(page, sections, f"time opener for {time_label}")
                     break
-                await page.wait_for_timeout(400)
+                await page.wait_for_timeout(500)
+                sections.append(f"Opened the time picker for {time_label}; waiting up to 60 seconds for its loading skeletons to disappear.")
+                try:
+                    await page.wait_for_function("""() => {
+                      const panel = document.querySelector('[data-testid="Bottom Panel"]');
+                      if (!panel) return false;
+                      return panel.querySelectorAll('.react-loading-skeleton').length === 0;
+                    }""", timeout=60000)
+                    sections.append("Time picker loading skeletons have disappeared.")
+                except Exception as exc:
+                    sections.append(f"Time picker still appears to be loading after 60 seconds: {type(exc).__name__}: {exc}")
+                await page.wait_for_timeout(700)
                 sections.append(await capture(page, f"TIME PICKER OPEN FOR {time_label}"))
                 slot = page.get_by_role("button", name=re.compile(rf"^{re.escape(time_label)}$", re.I))
                 if await slot.count() != 1 or not await slot.is_enabled():
