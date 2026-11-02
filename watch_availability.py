@@ -159,7 +159,7 @@ async def read_completed_result(page):
     previous = None
     stable_since = None
     while time.monotonic() < deadline:
-        text = re.sub(r"\\s+", " ", await page.locator("body").inner_text()).strip()
+        text = re.sub(r"\s+", " ", await page.locator("body").inner_text()).strip()
         result_state = await page.evaluate(
             """() => {
               const skeletons = document.querySelectorAll('.react-loading-skeleton');
@@ -231,7 +231,7 @@ async def main():
         print(f"Check {cycle}: starting TableCheck search.", flush=True)
         try:
             potential, result = await check_once()
-            print("Completed TableCheck result:\\n" + result[:5000], flush=True)
+            print("Completed TableCheck result:\n" + result[:5000], flush=True)
             if potential and not alerted:
                 send_alert(result)
                 alerted = True
@@ -259,7 +259,7 @@ async def main():
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as handle:
-            handle.write(f"alerted={'true' if alerted else 'false'}\\n")
+            handle.write(f"alerted={'true' if alerted else 'false'}\n")
     print(f"Watcher segment complete. Alert state: {alerted}.", flush=True)
 
 
