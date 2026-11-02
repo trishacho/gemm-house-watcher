@@ -153,11 +153,11 @@ async def main():
             # Navigate month-by-month until the calendar shows December 2026.
             for month_step in range(3):
                 calendar_text = await page.get_by_test_id("Bottom Panel").inner_text()
-                if re.search(r"December\\s+2026", calendar_text, re.I):
+                if re.search(r"December\s+2026", calendar_text, re.I):
                     break
                 panel_buttons = page.get_by_test_id("Bottom Panel").locator("button")
                 explicit_next = page.locator('[data-testid="Bottom Panel"] button[aria-label*="next" i], [data-testid="Bottom Panel"] button[title*="next" i], [data-testid="Bottom Panel"] button[data-testid*="next" i]')
-                arrow_next = panel_buttons.filter(has_text=re.compile(r"^\\s*(>|›|»)\\s*$"))
+                arrow_next = panel_buttons.filter(has_text=re.compile(r"^\s*(>|›|»)\s*$"))
                 if await explicit_next.count() == 1 and await explicit_next.is_visible() and await explicit_next.is_enabled():
                     await explicit_next.click()
                 elif await arrow_next.count() == 1 and await arrow_next.is_visible() and await arrow_next.is_enabled():
@@ -168,9 +168,9 @@ async def main():
                 await page.wait_for_timeout(350)
             calendar_text = await page.get_by_test_id("Bottom Panel").inner_text()
             sections.append(f"Calendar after month navigation: {calendar_text[:1200]}")
-            if re.search(r"December\\s+2026", calendar_text, re.I):
+            if re.search(r"December\s+2026", calendar_text, re.I):
                 dec2_button = page.get_by_test_id("Bottom Panel").locator("button").filter(
-                    has_text=re.compile(r"^\\s*2\\s*$")
+                    has_text=re.compile(r"^\s*2\s*$")
                 )
                 if await dec2_button.count() == 1 and await dec2_button.is_enabled():
                     await dec2_button.click()
