@@ -170,10 +170,12 @@ async def main():
                 state = await dec2_button.get_attribute("data-state") if await dec2_button.count() == 1 else None
                 if await dec2_button.count() == 1 and state != "outside" and await dec2_button.is_enabled():
                     await dec2_button.click()
-                    await page.wait_for_timeout(1000)
-                    selected_state = await dec2_button.get_attribute("data-state")
-                    date_label = await page.get_by_test_id("Landing Date Panel Opener Button").inner_text()
-                    sections.append(f"Clicked Dec 2 in the December grid; resulting cell state={selected_state!r}, date opener={date_label!r}.")
+                    await page.wait_for_timeout(1200)
+                    # Selecting a date closes/unmounts the calendar, so do
+                    # not query the old day locator afterward (it will time out).
+                    date_opener = page.get_by_test_id("Landing Date Panel Opener Button")
+                    date_label = await date_opener.inner_text() if await date_opener.count() == 1 else "<date opener missing>"
+                    sections.append(f"Clicked Dec 2 in the December grid; date opener now reads {date_label!r}.")
                     sections.append(await capture(page, "DECEMBER 2 SELECTION CHECK"))
                 else:
                     sections.append(f"Dec 2 was not selectable as an in-month date; count={await dec2_button.count()}, state={state!r}.")
