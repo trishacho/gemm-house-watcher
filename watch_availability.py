@@ -18,9 +18,16 @@ NO_ALTERNATIVE_DATES = "No other availability found between"
 ALTERNATIVES_HEADING = "Other dates with availability"
 
 
-def send_alert(result_text):
+def send_message(message):
     sender = os.environ["GMAIL_ADDRESS"]
     password = os.environ["GMAIL_APP_PASSWORD"]
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+        smtp.login(sender, password)
+        smtp.send_message(message)
+
+
+def send_alert(result_text):
+    sender = os.environ["GMAIL_ADDRESS"]
     recipient = os.environ["ALERT_EMAIL"]
     message = EmailMessage()
     message["Subject"] = "Possible GEMM HOUSE reservation opening"
@@ -36,9 +43,24 @@ def send_alert(result_text):
         "No reservation was made. This watcher never confirms or pays.\n\n"
         "TableCheck result text:\n" + result_text[:5000]
     )
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
-        smtp.login(sender, password)
-        smtp.send_message(message)
+    send_message(message)
+
+
+def send_test_email():
+    sender = os.environ["GMAIL_ADDRESS"]
+    recipient = os.environ["ALERT_EMAIL"]
+    message = EmailMessage()
+    message["Subject"] = "[TEST] GEMM HOUSE watcher email is working"
+    message["From"] = sender
+    message["To"] = recipient
+    message.set_content(
+        "This is a test email from your GEMM HOUSE availability watcher.\n\n"
+        "It confirms that GitHub Actions successfully authenticated with Gmail "
+        "and submitted an email to this address.\n\n"
+        "This is not an availability alert. No TableCheck search was performed, "
+        "and no reservation was made."
+    )
+    send_message(message)
 
 
 async def prepare_search(page):
@@ -137,7 +159,7 @@ async def read_completed_result(page):
     previous = None
     stable_since = None
     while time.monotonic() < deadline:
-        text = re.sub(r"\s+", " ", await page.locator("body").inner_text()).strip()
+        text = re.sub(r"\\s+", " ", await page.locator("body").inner_text()).strip()
         result_state = await page.evaluate(
             """() => {
               const skeletons = document.querySelectorAll('.react-loading-skeleton');
@@ -194,17 +216,22 @@ async def main():
     missing = [name for name in required_secrets if not os.environ.get(name)]
     if missing:
         raise RuntimeError("Add these GitHub Actions repository secrets before starting: " + ", ".join(missing))
+    watch_mode = os.environ.get("WATCH_MODE", "test").lower()
+    if watch_mode == "email-test":
+        send_test_email()
+        print("Test email sent successfully to ALERT_EMAIL.", flush=True)
+        return
+
     alerted = os.environ.get("ALERTED", "false").lower() == "true"
     started = time.monotonic()
     cycle = 0
-    watch_mode = os.environ.get("WATCH_MODE", "test").lower()
     while cycle == 0 or (watch_mode != "test" and time.monotonic() - started < RUN_SECONDS):
         cycle += 1
         check_started = time.monotonic()
         print(f"Check {cycle}: starting TableCheck search.", flush=True)
         try:
             potential, result = await check_once()
-            print("Completed TableCheck result:\n" + result[:5000], flush=True)
+            print("Completed TableCheck result:\\n" + result[:5000], flush=True)
             if potential and not alerted:
                 send_alert(result)
                 alerted = True
@@ -232,7 +259,7 @@ async def main():
     output = os.environ.get("GITHUB_OUTPUT")
     if output:
         with open(output, "a", encoding="utf-8") as handle:
-            handle.write(f"alerted={'true' if alerted else 'false'}\n")
+            handle.write(f"alerted={'true' if alerted else 'false'}\\n")
     print(f"Watcher segment complete. Alert state: {alerted}.", flush=True)
 
 
