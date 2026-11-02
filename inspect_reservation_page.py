@@ -31,7 +31,26 @@ async def capture(page, label):
         title: document.title,
         url: location.href,
         bodyText: clean(document.body?.innerText || '').slice(0, 18000),
-        controls: nodes
+        controls: nodes,
+        bottomPanelHTML: (() => {
+          const el = document.querySelector('[data-testid="Bottom Panel"]');
+          return el ? el.outerHTML.slice(0, 14000) : '<Bottom Panel not present>';
+        })(),
+        panelCandidates: (() => {
+          const panel = document.querySelector('[data-testid="Bottom Panel"]');
+          if (!panel) return [];
+          return [...panel.querySelectorAll('*')].filter(visible).slice(0, 160).map(el => ({
+            tag: el.tagName.toLowerCase(),
+            role: el.getAttribute('role') || '',
+            text: clean(el.innerText || el.textContent || '').slice(0, 180),
+            testId: el.getAttribute('data-testid') || '',
+            ariaLabel: el.getAttribute('aria-label') || '',
+            dataTime: el.getAttribute('data-time') || '',
+            dataState: el.getAttribute('data-state') || '',
+            disabled: !!el.disabled,
+            className: String(el.className || '').slice(0, 180)
+          }));
+        })()
       };
     }""")
     lines = [
@@ -41,6 +60,14 @@ async def capture(page, label):
         "",
         "VISIBLE PAGE TEXT:",
         details["bodyText"],
+        "",
+        "BOTTOM PANEL HTML (first 14000 chars):",
+        details["bottomPanelHTML"],
+        "",
+        "BOTTOM PANEL VISIBLE DESCENDANTS:",
+    ]
+    lines.extend(str(item) for item in details["panelCandidates"])
+    lines += [
         "",
         "VISIBLE CONTROLS (first 300):",
     ]
@@ -82,6 +109,8 @@ async def main():
         page = await browser.new_page(viewport={"width": 1440, "height": 1100})
         page.set_default_timeout(8000)
         errors = []
+        responses = []
+        page.on("response", lambda response: responses.append(f"HTTP {response.status} {response.url}") if response.status >= 400 else None)
         page.on("console", lambda msg: errors.append(f"console[{msg.type}]: {msg.text}") if msg.type == "error" else None)
         page.on("pageerror", lambda err: errors.append(f"pageerror: {err}"))
         response = await page.goto(BOOKING_URL, wait_until="domcontentloaded", timeout=60000)
@@ -229,6 +258,8 @@ async def main():
         else:
             sections.append(f"Time opener not found uniquely; count={await time_button.count()}.")
 
+        if responses:
+            sections += ["=== HTTP RESPONSES >= 400 ===", *responses[:50]]
         if errors:
             sections += ["=== BROWSER ERRORS ===", *errors[:50]]
         Path("page-inspection.txt").write_text("\n\n".join(sections), encoding="utf-8")
