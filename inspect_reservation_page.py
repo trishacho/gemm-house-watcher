@@ -73,28 +73,45 @@ async def main():
                 await page.wait_for_timeout(8000)
                 sections.append(await capture(page, "AFTER TERMS CONFIRMATION"))
 
-                # Open only the guest/date/time pickers to inspect their options.
-                # Do not choose a slot or press Find availability.
+                # Inspect pickers conservatively. Some TableCheck overlays intercept
+                # pointer events; never force a click through an overlay.
                 guests = page.get_by_role("button", name="2 Guests", exact=True)
-                if await guests.count() == 1 and await guests.is_enabled():
-                    await guests.click()
-                    await page.wait_for_timeout(700)
-                    sections.append(await capture(page, "GUEST PICKER OPEN"))
-                    await page.keyboard.press("Escape")
+                if await guests.count() == 1:
+                    try:
+                        await guests.click(timeout=5000)
+                        await page.wait_for_timeout(500)
+                        sections.append(await capture(page, "GUEST PICKER OPEN"))
+                        await page.keyboard.press("Escape")
+                        await page.wait_for_timeout(300)
+                    except Exception as exc:
+                        sections.append(f"Guest picker could not be opened safely: {type(exc).__name__}: {exc}")
 
-                date_button = page.get_by_role("button", name="No dates available", exact=True)
-                if await date_button.count() == 1 and await date_button.is_enabled():
-                    await date_button.click()
-                    await page.wait_for_timeout(700)
-                    sections.append(await capture(page, "DATE PICKER OPEN"))
-                    await page.keyboard.press("Escape")
+                # Record date/time button metadata and any open overlays without
+                # clicking a button that currently says no dates are available.
+                picker_state = await page.evaluate("""() => {
+                  const selectors = [
+                    '[data-testid*="Date"]', '[data-testid*="Time"]',
+                    '[data-testid*="Guest"]', '[role="dialog"]',
+                    '[data-state="open"]', '[data-radix-popper-content-wrapper]'
+                  ];
+                  const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+                  const unique = [...new Set(selectors.flatMap(sel => [...document.querySelectorAll(sel)]))];
+                  return unique.filter(el => {
+                    const r = el.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                  }).map(el => ({
+                    tag: el.tagName.toLowerCase(),
+                    testId: el.getAttribute('data-testid') || '',
+                    role: el.getAttribute('role') || '',
+                    text: clean(el.innerText || '').slice(0, 1000),
+                    ariaLabel: el.getAttribute('aria-label') || '',
+                    disabled: !!el.disabled,
+                    className: String(el.className || '').slice(0, 300)
+                  })).slice(0, 100);
+                }""")
+                sections.append("=== PICKER / OVERLAY METADATA ===")
+                sections.append(str(picker_state))
 
-                time_button = page.get_by_role("button", name="Select a time", exact=True)
-                if await time_button.count() == 1 and await time_button.is_enabled():
-                    await time_button.click()
-                    await page.wait_for_timeout(700)
-                    sections.append(await capture(page, "TIME PICKER OPEN"))
-                    await page.keyboard.press("Escape")
             else:
                 sections.append("Did not click: native confirmation button is not visible/enabled.")
         else:
