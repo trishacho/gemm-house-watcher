@@ -61,15 +61,21 @@ async def main():
 
         # This confirms the displayed terms only. It does not choose a date/time,
         # submit a reservation, or make a payment.
-        confirm = page.get_by_role("button", name="Confirm and continue", exact=True)
+        # The page exposes both a wrapper with role=button and its nested
+        # native button. Target the native button to avoid counting both.
+        confirm = page.locator("button").filter(has_text="Confirm and continue")
         count = await confirm.count()
-        sections.append(f"Terms confirmation buttons found: {count}")
-        if count == 1 and await confirm.is_visible() and await confirm.is_enabled():
-            await confirm.click()
-            await page.wait_for_timeout(8000)
-            sections.append(await capture(page, "AFTER TERMS CONFIRMATION"))
+        sections.append(f"Native terms confirmation buttons found: {count}")
+        if count >= 1:
+            target = confirm.first
+            if await target.is_visible() and await target.is_enabled():
+                await target.click()
+                await page.wait_for_timeout(10000)
+                sections.append(await capture(page, "AFTER TERMS CONFIRMATION"))
+            else:
+                sections.append("Did not click: native confirmation button is not visible/enabled.")
         else:
-            sections.append("Did not click: expected exactly one visible, enabled terms confirmation button.")
+            sections.append("Did not click: no native confirmation button found.")
 
         if errors:
             sections += ["=== BROWSER ERRORS ===", *errors[:50]]
