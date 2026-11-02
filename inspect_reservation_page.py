@@ -70,8 +70,31 @@ async def main():
             target = confirm.first
             if await target.is_visible() and await target.is_enabled():
                 await target.click()
-                await page.wait_for_timeout(10000)
+                await page.wait_for_timeout(8000)
                 sections.append(await capture(page, "AFTER TERMS CONFIRMATION"))
+
+                # Open only the guest/date/time pickers to inspect their options.
+                # Do not choose a slot or press Find availability.
+                guests = page.get_by_role("button", name="2 Guests", exact=True)
+                if await guests.count() == 1 and await guests.is_enabled():
+                    await guests.click()
+                    await page.wait_for_timeout(700)
+                    sections.append(await capture(page, "GUEST PICKER OPEN"))
+                    await page.keyboard.press("Escape")
+
+                date_button = page.get_by_role("button", name="No dates available", exact=True)
+                if await date_button.count() == 1 and await date_button.is_enabled():
+                    await date_button.click()
+                    await page.wait_for_timeout(700)
+                    sections.append(await capture(page, "DATE PICKER OPEN"))
+                    await page.keyboard.press("Escape")
+
+                time_button = page.get_by_role("button", name="Select a time", exact=True)
+                if await time_button.count() == 1 and await time_button.is_enabled():
+                    await time_button.click()
+                    await page.wait_for_timeout(700)
+                    sections.append(await capture(page, "TIME PICKER OPEN"))
+                    await page.keyboard.press("Escape")
             else:
                 sections.append("Did not click: native confirmation button is not visible/enabled.")
         else:
