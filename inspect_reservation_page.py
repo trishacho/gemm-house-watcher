@@ -56,6 +56,25 @@ async def click_first_enabled(locator, label, sections):
     await sections.append(f"Did not click {label}: matching visible/enabled control count={count}.")
     return False
 
+
+
+async def dismiss_bottom_panel(page, sections, label):
+    # Dismiss TableCheck's fixed calendar/time bottom sheet before using the form.
+    for _ in range(2):
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(250)
+        panel = page.get_by_test_id("Bottom Panel")
+        if await panel.count() == 0 or not await panel.first.is_visible():
+            sections.append(f"Closed bottom panel after {label} with Escape.")
+            return True
+    await page.mouse.click(700, 140)
+    await page.wait_for_timeout(400)
+    panel = page.get_by_test_id("Bottom Panel")
+    closed = await panel.count() == 0 or not await panel.first.is_visible()
+    status = "closed" if closed else "still visible"
+    sections.append(f"Bottom panel dismissal after {label}: {status}.")
+    return closed
+
 async def main():
     sections = []
     async with async_playwright() as p:
@@ -140,25 +159,34 @@ async def main():
                 sections.append(await capture(page, "DECEMBER 2 SELECTED"))
             else:
                 sections.append(f"Dec 2 not uniquely selectable by full date label; count={await date_candidates.count()}. Calendar left unchanged.")
-                await page.keyboard.press("Escape")
+                await dismiss_bottom_panel(page, sections, "date picker")
         else:
             sections.append(f"Date opener not found uniquely; count={await date_button.count()}.")
 
+        # Ensure the calendar sheet is gone before trying to open the time sheet.
+        panel_closed = await dismiss_bottom_panel(page, sections, "calendar selection")
+        if not panel_closed:
+            sections.append("Safety stop: time picker not opened because the calendar bottom panel remained on screen.")
         # Select each requested morning slot in turn and press Find availability.
         # This is a search only; the script never selects a result or books.
         time_button = page.get_by_test_id("Landing Time Panel Opener Button")
-        if await time_button.count() == 1:
+        if panel_closed and await time_button.count() == 1:
             for time_label in TARGET_TIMES:
                 # Re-open the time panel for each independent time search.
                 if not await time_button.is_visible():
                     break
-                await time_button.click()
+                try:
+                    await time_button.click(timeout=8000)
+                except Exception as exc:
+                    sections.append(f"Could not open time picker for {time_label}: {type(exc).__name__}: {exc}")
+                    await dismiss_bottom_panel(page, sections, f"time opener for {time_label}")
+                    break
                 await page.wait_for_timeout(400)
                 sections.append(await capture(page, f"TIME PICKER OPEN FOR {time_label}"))
                 slot = page.get_by_role("button", name=re.compile(rf"^{re.escape(time_label)}$", re.I))
                 if await slot.count() != 1 or not await slot.is_enabled():
                     sections.append(f"Time {time_label} not uniquely available as a selectable button; count={await slot.count()}.")
-                    await page.keyboard.press("Escape")
+                    await dismiss_bottom_panel(page, sections, f"missing time {time_label}")
                     continue
                 await slot.click()
                 await page.wait_for_timeout(300)
