@@ -260,13 +260,18 @@ async def main():
                     await find_button.click()
                     sections.append(f"Submitted availability search for {time_label}; waiting up to 60 seconds for Find availability to stop loading.")
                     try:
+                        # The landing-page button disappears during navigation,
+                        # so its absence is NOT proof that results have loaded.
+                        # Wait for the availability route and for every result
+                        # cell to leave its loading state.
+                        await page.wait_for_url(re.compile(r".*/reserve/availability(?:\\?.*)?$"), timeout=60000)
                         await page.wait_for_function("""() => {
-                          const button = document.querySelector('[data-testid="Landing Find A Table Button"]');
-                          return !button || (button.getAttribute('aria-busy') !== 'true' && !button.disabled);
+                          const cells = [...document.querySelectorAll('[data-testid="Time Grid Cell"]')];
+                          return cells.length > 0 && cells.every(cell => cell.getAttribute('data-loading') !== 'true');
                         }""", timeout=60000)
-                        sections.append("Availability search finished: Find availability is no longer busy.")
+                        sections.append("Availability results finished loading: all Time Grid Cell controls left data-loading=true.")
                     except Exception as exc:
-                        sections.append(f"Availability search did not finish within 60 seconds: {type(exc).__name__}: {exc}")
+                        sections.append(f"Availability results did not finish loading within 60 seconds: {type(exc).__name__}: {exc}")
                     await page.wait_for_timeout(1200)
                     sections.append(await capture(page, f"AVAILABILITY RESULT FOR {time_label}"))
                 else:
