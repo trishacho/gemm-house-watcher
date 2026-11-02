@@ -14,7 +14,7 @@ async def capture(page, label):
         const s = getComputedStyle(el);
         return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
       };
-      const clean = (s) => (s || '').replace(/\\\\s+/g, ' ').trim();
+      const clean = (s) => (s || '').replace(/\\s+/g, ' ').trim();
       const nodes = [...document.querySelectorAll('button, a, input, select, textarea, [role="button"], [role="combobox"], [role="option"], [role="radio"], [role="checkbox"]')]
         .filter(visible).map((el) => ({
           tag: el.tagName.toLowerCase(),
@@ -120,7 +120,7 @@ async def main():
             sections.append(await capture(page, "DATE PICKER OPEN"))
             # Select only a clearly-labelled Dec 2 option; do not guess at a
             # bare day-number button that could belong to another month.
-            date_candidates = page.get_by_role("button", name=re.compile(r"(Wed,?\\s*)?Dec\\s*2", re.I))
+            date_candidates = page.get_by_role("button", name=re.compile(r"(Wed,?\s*)?Dec\s*2", re.I))
             if await date_candidates.count() == 1 and await date_candidates.is_enabled():
                 await date_candidates.click()
                 await page.wait_for_timeout(700)
