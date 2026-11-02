@@ -73,21 +73,52 @@ async def main():
                 await page.wait_for_timeout(8000)
                 sections.append(await capture(page, "AFTER TERMS CONFIRMATION"))
 
-                # Inspect pickers conservatively. Some TableCheck overlays intercept
-                # pointer events; never force a click through an overlay.
+                # Set party size to four in the guest picker, then confirm that
+                # picker. This changes only the search criteria; it does not book.
                 guests = page.get_by_role("button", name="2 Guests", exact=True)
                 if await guests.count() == 1:
                     try:
-                        await guests.click(timeout=5000)
+                        await guests.click(timeout=8000)
                         await page.wait_for_timeout(500)
                         sections.append(await capture(page, "GUEST PICKER OPEN"))
-                        await page.keyboard.press("Escape")
-                        await page.wait_for_timeout(300)
+                        guest_select = page.locator("select").filter(has=page.locator("option[value='4']"))
+                        if await guest_select.count() == 1:
+                            await guest_select.select_option("4")
+                            await page.wait_for_timeout(300)
+                            sections.append(await capture(page, "GUEST COUNT SET TO FOUR"))
+                        confirm_guest = page.get_by_role("button", name="Confirm", exact=True)
+                        if await confirm_guest.count() == 1 and await confirm_guest.is_enabled():
+                            await confirm_guest.click(timeout=8000)
+                            await page.wait_for_timeout(1000)
+                            sections.append(await capture(page, "GUEST PICKER CONFIRMED"))
+                        else:
+                            sections.append("Guest picker Confirm button not found/enabled.")
                     except Exception as exc:
-                        sections.append(f"Guest picker could not be opened safely: {type(exc).__name__}: {exc}")
+                        sections.append(f"Guest picker interaction failed: {type(exc).__name__}: {exc}")
 
-                # Record date/time button metadata and any open overlays without
-                # clicking a button that currently says no dates are available.
+                # Open the date panel only after the guest dialog is confirmed.
+                # No date is selected unless it is explicitly visible as an option.
+                date_button = page.get_by_test_id("Landing Date Panel Opener Button")
+                if await date_button.count() == 1:
+                    try:
+                        await date_button.click(timeout=8000)
+                        await page.wait_for_timeout(700)
+                        sections.append(await capture(page, "DATE PICKER OPEN"))
+                        await page.keyboard.press("Escape")
+                    except Exception as exc:
+                        sections.append(f"Date picker could not be opened safely: {type(exc).__name__}: {exc}")
+
+                # Open the time panel for inspection only; do not select a slot.
+                time_button = page.get_by_test_id("Landing Time Panel Opener Button")
+                if await time_button.count() == 1:
+                    try:
+                        await time_button.click(timeout=8000)
+                        await page.wait_for_timeout(700)
+                        sections.append(await capture(page, "TIME PICKER OPEN"))
+                        await page.keyboard.press("Escape")
+                    except Exception as exc:
+                        sections.append(f"Time picker could not be opened safely: {type(exc).__name__}: {exc}")
+
                 picker_state = await page.evaluate("""() => {
                   const selectors = [
                     '[data-testid*="Date"]', '[data-testid*="Time"]',
@@ -103,7 +134,7 @@ async def main():
                     tag: el.tagName.toLowerCase(),
                     testId: el.getAttribute('data-testid') || '',
                     role: el.getAttribute('role') || '',
-                    text: clean(el.innerText || '').slice(0, 1000),
+                    text: clean(el.innerText || '').slice(0, 1500),
                     ariaLabel: el.getAttribute('aria-label') || '',
                     disabled: !!el.disabled,
                     className: String(el.className || '').slice(0, 300)
