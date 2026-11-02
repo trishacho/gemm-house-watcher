@@ -88,11 +88,8 @@ async def main():
             await guests.click()
             await page.wait_for_timeout(500)
             sections.append(await capture(page, "GUEST PICKER OPEN"))
-            plus = page.locator(
-                'button[aria-label*="increase" i], button[aria-label*="increment" i], '
-                'button[title*="increase" i], button[title*="increment" i], '
-                'button[data-testid*="increment" i], button[data-testid*="increase" i]'
-            )
+            # TableCheck exposes the plus control with this exact test id.
+            plus = page.get_by_test_id("Counter Add Button")
             if await plus.count() == 1 and await plus.is_visible() and await plus.is_enabled():
                 await plus.click()
                 await page.wait_for_timeout(250)
