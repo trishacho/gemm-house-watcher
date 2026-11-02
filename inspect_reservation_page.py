@@ -150,18 +150,37 @@ async def main():
             await date_button.click()
             await page.wait_for_timeout(700)
             sections.append(await capture(page, "DATE PICKER OPEN"))
-            # The calendar may render early-December dates in the trailing
-            # row of November. Select by its exact ISO date, not by day number
-            # or by advancing blindly into later months.
+            # Dec 2 initially appears as an outside-month cell in the
+            # November grid. Clicking that cell can merely change the visible
+            # month, so first advance exactly one month and verify the exact
+            # date is now an in-month cell before selecting it.
             dec2_button = page.locator('button[data-testid="day"][data-date="2026-12-02"]')
-            if await dec2_button.count() == 1 and await dec2_button.is_enabled():
-                await dec2_button.click()
-                await page.wait_for_timeout(700)
-                sections.append("Selected the exact calendar cell with data-date=2026-12-02.")
-                sections.append(await capture(page, "DECEMBER 2 SELECTED"))
+            if await dec2_button.count() == 1:
+                state = await dec2_button.get_attribute("data-state")
+                if state == "outside":
+                    next_month = page.get_by_test_id("Calendar Next Month Button")
+                    if await next_month.count() == 1 and await next_month.is_enabled():
+                        await next_month.click()
+                        await page.wait_for_timeout(700)
+                        sections.append("Advanced calendar exactly one month; checking Dec 2 in the December grid.")
+                        sections.append(await capture(page, "DECEMBER CALENDAR OPEN"))
+                    else:
+                        sections.append("Could not uniquely identify the enabled next-month button.")
+                dec2_button = page.locator('button[data-testid="day"][data-date="2026-12-02"]')
+                state = await dec2_button.get_attribute("data-state") if await dec2_button.count() == 1 else None
+                if await dec2_button.count() == 1 and state != "outside" and await dec2_button.is_enabled():
+                    await dec2_button.click()
+                    await page.wait_for_timeout(1000)
+                    selected_state = await dec2_button.get_attribute("data-state")
+                    date_label = await page.get_by_test_id("Landing Date Panel Opener Button").inner_text()
+                    sections.append(f"Clicked Dec 2 in the December grid; resulting cell state={selected_state!r}, date opener={date_label!r}.")
+                    sections.append(await capture(page, "DECEMBER 2 SELECTION CHECK"))
+                else:
+                    sections.append(f"Dec 2 was not selectable as an in-month date; count={await dec2_button.count()}, state={state!r}.")
+                    sections.append(await capture(page, "DECEMBER 2 CELL NOT SELECTED"))
             else:
-                sections.append(f"Dec 2 exact-date cell not uniquely selectable; count={await dec2_button.count()}.")
-                sections.append(await capture(page, "DECEMBER 2 CELL NOT SELECTED"))
+                sections.append(f"Dec 2 exact-date cell not uniquely found; count={await dec2_button.count()}.")
+                sections.append(await capture(page, "DECEMBER 2 CELL NOT FOUND"))
             await dismiss_bottom_panel(page, sections, "date selection")
         else:
             sections.append(f"Date opener not found uniquely; count={await date_button.count()}.")
