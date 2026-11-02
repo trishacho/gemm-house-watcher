@@ -1,0 +1,53 @@
+name: GEMM HOUSE availability watcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      alerted:
+        description: Whether an opening alert has already been sent
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: gemm-house-availability-watcher
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Watch TableCheck and email on potential openings
+        id: watch
+        env:
+          ALERTED: \${{ inputs.alerted }}
+          GMAIL_ADDRESS: \${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: \${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_EMAIL: \${{ secrets.ALERT_EMAIL }}
+        run: python watch_availability.py
+
+      - name: Continue watcher in a fresh runner
+        if: success()
+        env:
+          GH_TOKEN: \${{ github.token }}
+          ALERTED: \${{ steps.watch.outputs.alerted }}
+        run: |
+          gh workflow run watch.yml -f alerted="$ALERTED"
