@@ -197,7 +197,8 @@ async def main():
     alerted = os.environ.get("ALERTED", "false").lower() == "true"
     started = time.monotonic()
     cycle = 0
-    while time.monotonic() - started < RUN_SECONDS:
+    watch_mode = os.environ.get("WATCH_MODE", "test").lower()
+    while cycle == 0 or (watch_mode != "test" and time.monotonic() - started < RUN_SECONDS):
         cycle += 1
         check_started = time.monotonic()
         print(f"Check {cycle}: starting TableCheck search.", flush=True)
@@ -215,6 +216,10 @@ async def main():
                 print("No availability for selected slot or alternative dates.", flush=True)
         except Exception as exc:
             print(f"Check failed safely; no email sent: {type(exc).__name__}: {exc}", flush=True)
+
+        if watch_mode == "test":
+            print("One-check test complete; continuous monitoring was not started.", flush=True)
+            break
 
         interval = random.choice(INTERVALS_MINUTES)
         elapsed = time.monotonic() - check_started
