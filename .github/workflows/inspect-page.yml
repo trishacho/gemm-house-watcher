@@ -1,0 +1,36 @@
+name: Inspect GEMM HOUSE reservation page
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: Inspect reservation page (read-only)
+        run: python inspect_reservation_page.py
+      - name: Upload inspection output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gemm-house-page-inspection
+          path: |
+            page-inspection.txt
+            page-screenshot.png
+          if-no-files-found: warn
+          retention-days: 3
