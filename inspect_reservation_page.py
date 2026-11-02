@@ -82,6 +82,7 @@ async def main():
         # Party size: use the visible plus/increment control twice from the
         # observed default of two guests. If the control is not identifiable,
         # save its markup rather than guessing which unlabeled button is +.
+        party_size_set = False
         guests = page.get_by_role("button", name="2 Guests", exact=True)
         if await guests.count() == 1:
             await guests.click()
@@ -97,19 +98,34 @@ async def main():
                 await page.wait_for_timeout(250)
                 await plus.click()
                 await page.wait_for_timeout(300)
-                sections.append("Clicked the identified + control twice to move from 2 to 4.")
+                selected_value = await page.locator("select").first.input_value() if await page.locator("select").count() else ""
+                party_size_set = selected_value == "4"
+                sections.append(f"Clicked the identified + control twice; guest selector value is {selected_value!r}.")
                 sections.append(await capture(page, "GUEST COUNT AFTER PLUS x2"))
             else:
                 sections.append(f"Could not safely identify a labelled + control; count={await plus.count()}. No unlabeled button was guessed.")
-            confirm_guest = page.get_by_role("button", name="Confirm", exact=True)
-            if await confirm_guest.count() == 1 and await confirm_guest.is_enabled():
-                await confirm_guest.click()
-                await page.wait_for_timeout(1000)
-                sections.append(await capture(page, "GUEST PICKER CONFIRMED"))
+            if party_size_set:
+                confirm_guest = page.get_by_role("button", name="Confirm", exact=True)
+                if await confirm_guest.count() == 1 and await confirm_guest.is_enabled():
+                    await confirm_guest.click()
+                    await page.wait_for_timeout(1000)
+                    sections.append(await capture(page, "GUEST PICKER CONFIRMED"))
+                else:
+                    party_size_set = False
+                    sections.append("Guest picker Confirm button was not uniquely found/enabled.")
             else:
-                sections.append("Guest picker Confirm button was not uniquely found/enabled.")
+                sections.append("Safety stop: did not confirm the guest picker because 4 guests was not verified.")
+                await page.keyboard.press("Escape")
         else:
             sections.append(f"Could not uniquely find the 2 Guests opener; count={await guests.count()}.")
+        if not party_size_set:
+            sections.append("Safety stop: date/time availability checks skipped because party size 4 was not confirmed.")
+            Path("page-inspection.txt").write_text("\\n\\n".join(sections), encoding="utf-8")
+            await page.screenshot(path="page-screenshot.png", full_page=True)
+            await browser.close()
+            print("\\n\\n".join(sections[:10]))
+            print("\\nSaved page-inspection.txt and page-screenshot.png")
+            return
 
         # Open calendar and capture the actual calendar controls. Dec 2 may not
         # be within TableCheck's 30-day booking window until Nov 2.
