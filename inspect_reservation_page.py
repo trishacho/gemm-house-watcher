@@ -247,7 +247,16 @@ async def main():
                 find_button = page.get_by_role("button", name=re.compile(r"^(Find|Check) availability$", re.I))
                 if await find_button.count() == 1 and await find_button.is_enabled():
                     await find_button.click()
-                    await page.wait_for_timeout(3500)
+                    sections.append(f"Submitted availability search for {time_label}; waiting up to 60 seconds for Find availability to stop loading.")
+                    try:
+                        await page.wait_for_function("""() => {
+                          const button = document.querySelector('[data-testid="Landing Find A Table Button"]');
+                          return !button || (button.getAttribute('aria-busy') !== 'true' && !button.disabled);
+                        }""", timeout=60000)
+                        sections.append("Availability search finished: Find availability is no longer busy.")
+                    except Exception as exc:
+                        sections.append(f"Availability search did not finish within 60 seconds: {type(exc).__name__}: {exc}")
+                    await page.wait_for_timeout(1200)
                     sections.append(await capture(page, f"AVAILABILITY RESULT FOR {time_label}"))
                 else:
                     sections.append(f"Find availability button not uniquely found/enabled for {time_label}; count={await find_button.count()}.")
