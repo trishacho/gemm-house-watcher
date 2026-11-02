@@ -212,7 +212,7 @@ async def main():
                 await slot.click()
                 await page.wait_for_timeout(300)
                 sections.append(await capture(page, f"TIME {time_label} SELECTED"))
-                find_button = page.get_by_role("button", name=re.compile(r"^Find availability$", re.I))
+                find_button = page.get_by_role("button", name=re.compile(r"^(Find|Check) availability$", re.I))
                 if await find_button.count() == 1 and await find_button.is_enabled():
                     await find_button.click()
                     await page.wait_for_timeout(3500)
