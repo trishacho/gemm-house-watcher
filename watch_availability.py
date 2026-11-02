@@ -138,18 +138,22 @@ async def read_completed_result(page):
     stable_since = None
     while time.monotonic() < deadline:
         text = re.sub(r"\s+", " ", await page.locator("body").inner_text()).strip()
-        loading = await page.evaluate(
+        result_state = await page.evaluate(
             """() => {
               const skeletons = document.querySelectorAll('.react-loading-skeleton');
-              const loadingCells = [...document.querySelectorAll('[data-testid="Time Grid Cell"]')]
-                .some(cell => cell.getAttribute('data-loading') === 'true');
-              return skeletons.length > 0 || loadingCells;
+              const cells = [...document.querySelectorAll('[data-testid="Time Grid Cell"]')];
+              return {
+                loading: skeletons.length > 0 || cells.some(cell => cell.getAttribute('data-loading') === 'true'),
+                settledGrid: cells.length > 0 && cells.every(cell => cell.getAttribute('data-loading') !== 'true')
+              };
             }"""
         )
+        loading = result_state["loading"]
         meaningful = (
             NO_CHOSEN_TIME in text
             or NO_ALTERNATIVE_DATES in text
             or ALTERNATIVES_HEADING in text
+            or result_state["settledGrid"]
         )
         if text == previous and meaningful and not loading:
             if stable_since is None:
@@ -186,6 +190,10 @@ async def check_once():
 
 
 async def main():
+    required_secrets = ("GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "ALERT_EMAIL")
+    missing = [name for name in required_secrets if not os.environ.get(name)]
+    if missing:
+        raise RuntimeError("Add these GitHub Actions repository secrets before starting: " + ", ".join(missing))
     alerted = os.environ.get("ALERTED", "false").lower() == "true"
     started = time.monotonic()
     cycle = 0
