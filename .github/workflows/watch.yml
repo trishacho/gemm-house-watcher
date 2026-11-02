@@ -38,16 +38,16 @@ jobs:
       - name: Watch TableCheck and email on potential openings
         id: watch
         env:
-          ALERTED: \${{ inputs.alerted }}
-          GMAIL_ADDRESS: \${{ secrets.GMAIL_ADDRESS }}
-          GMAIL_APP_PASSWORD: \${{ secrets.GMAIL_APP_PASSWORD }}
-          ALERT_EMAIL: \${{ secrets.ALERT_EMAIL }}
+          ALERTED: ${{ inputs.alerted }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
         run: python watch_availability.py
 
       - name: Continue watcher in a fresh runner
         if: success()
         env:
-          GH_TOKEN: \${{ github.token }}
-          ALERTED: \${{ steps.watch.outputs.alerted }}
+          GH_TOKEN: ${{ github.token }}
+          ALERTED: ${{ steps.watch.outputs.alerted }}
         run: |
           gh workflow run watch.yml -f alerted="$ALERTED"
